@@ -1,0 +1,14 @@
+[Desktop Entry]
+Categories=Settings;DesktopSettings;
+Comment=Open and extract XMI files
+Exec=/home/phil/DEV/xmission/xmission.py %f
+GenericName=Xmission
+Icon=/home/phil/DEV/xmission/xmission.png
+Keywords=theme;import;
+MimeType=application/x-plus-theme;
+Name=XMIssion
+Path=/tmp
+StartupNotify=true
+Terminal=false
+Type=Application
+Version=1.0
