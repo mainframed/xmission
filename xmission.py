@@ -8,7 +8,7 @@ import os
 import subprocess
 import time
 import logging
-from xmilib import XMIT
+import xmi
 import datetime
 import sys
 import pprint
@@ -16,10 +16,12 @@ from pathlib import Path
 import tempfile
 import re
 import argparse
+import threading
+import multiprocessing
 
-UI_FILE = "xmission.glade"
+running_folder = Path(Path(__file__).parent)
 
-#running_folder = os.path.dirname(os.path.abspath(__file__))
+UI_FILE = running_folder / "xmission.glade"
 
 # Create the Logger
 logger = logging.getLogger(__name__)
@@ -76,19 +78,20 @@ class XMIssion:
         "go_home" : self.go_home,
         "open_json" : self.open_json,
         "open_about" : self.show_about,
-        "close_about" : self.close_about
+        "close_about" : self.close_about,
+        #"loading_cancel_button_clicked_cb" : self.loading_cancelled
         }
 
         self.file_data = ""
         self.file_name = filename
         self.has_message = False
-        self.XMI = XMIT(loglevel=self.loglevel,
+        self.XMI = xmi.XMIT(loglevel=self.loglevel,
                 unnum=self.unnum, encoding=self.codepage,
-                force=self.force, binary=self.binary
+                force_convert=self.force, binary=self.binary
                 )
 
         self.builder = Gtk.Builder()
-        self.builder.add_from_file(UI_FILE)
+        self.builder.add_from_file(str(UI_FILE.resolve()))
         self.builder.connect_signals(self.handlers)
         self.main_window = self.builder.get_object('main window')
         self.err_window = self.builder.get_object('error message')
@@ -109,7 +112,7 @@ class XMIssion:
             with open(filename, 'rb') as x:
                 self.file_data = x.read()
             logger.debug("Total bytes: {}".format(len(self.file_data)))
-            self.load_file()
+            self.loading_file()
 
         #self.show_files()
 
@@ -162,7 +165,7 @@ class XMIssion:
         json_app_name = self.mime_app_name("text/plain")
         logger.debug("Opening {} with {} ({})".format("JSON", json_exec, json_app_name))
         giotype = Gio.content_type_from_mime_type("text/plain")
-        default_app = Gio.app_info_get_all_for_type("text/plain")[0]
+        #default_app = Gio.app_info_get_all_for_type("text/plain")[0]
         logger.debug("Extracting temp file to: {}".format(file_location))
         json = self.XMI.get_xmit_json()
 
@@ -170,7 +173,11 @@ class XMIssion:
                 json_temp_file.write(json)
 
         member_gfile = Gio.File.new_for_path(file_location)
-        open_app = default_app.launch([member_gfile], None)
+        uri = member_gfile.get_uri()
+        timestamp = Gtk.get_current_event_time()
+        Gtk.show_uri_on_window(None, uri, timestamp)
+
+        #open_app = default_app.launch([member_gfile], None)
 
 
     # def show_files(self):
@@ -232,7 +239,6 @@ class XMIssion:
             )
         selected = ", {total} selected ({size})"
 
-
         for files in self.get_selected():
 
             filename = files[0]
@@ -241,7 +247,7 @@ class XMIssion:
             if not pds:
                 logger.debug("{} Selected".format(filename))
                 if self.XMI.is_sequential(filename):
-                    size += self.XMI.get_folder_size(filename)
+                    size += self.XMI.get_dataset_size(filename)
                 objects_selected += 1
             else:
                 logger.debug("{} Selected ({})".format(filename, pds))
@@ -291,14 +297,14 @@ class XMIssion:
         else:
             file_name_w_ext = filename
 
-        self.file_store_treeview.append([img,                                       # file_icon
-                                        file_name_w_ext, # file_name
-                                        self.sizeof_fmt(info['size']),              # file_size
-                                        desc,                                       # file_type
-                                        file_last_modified,                         # file_modify
-                                        owner,                                      # file_owner
-                                        filename,                                   # actual_name
-                                        parent])                                    # parent_name
+        self.file_store_treeview.append([img,  # file_icon
+                                        file_name_w_ext,  # file_name
+                                        self.sizeof_fmt(info['size']),  # file_size
+                                        desc,  # file_type
+                                        file_last_modified,  # file_modify
+                                        owner,  # file_owner
+                                        filename,  # actual_name
+                                        parent])  # parent_name
 
 
     def mime_desc(self,mime_type):
@@ -342,7 +348,7 @@ class XMIssion:
             Gtk.ResponseType.OK)
 
         file_filter = Gtk.FileFilter()
-        file_filter.set_name("XMIT Files")
+        file_filter.set_name("XMI Files")
         file_filter.add_pattern("*.xmi")
         file_filter.add_pattern("*.bin")
         file_filter.add_pattern("*.xmit")
@@ -350,7 +356,7 @@ class XMIssion:
         file_filter.add_pattern("*.XMIT")
         dialog.add_filter(file_filter)
         file_filter = Gtk.FileFilter()
-        file_filter.set_name("Virtual Tape Files")
+        file_filter.set_name("AWS/HET Virtual Tape")
         file_filter.add_pattern("*.aws")
         file_filter.add_pattern("*.het")
         file_filter.add_pattern("*.AWS")
@@ -369,39 +375,43 @@ class XMIssion:
         # show the dialog
         dialog.show()
 
-
     def change_radio_convert(self, button):
         convert_widget = self._resolve_radio(self.builder.get_object("convert_guess"))
-        convert_type = Gtk.Buildable.get_name(convert_widget)
+        convert_type = button.get_label()
         logger.debug("Convert type changed to: {}".format(convert_type))
         unnum = self.builder.get_object("unnum")
+        print(button.get_active())
+        if not button.get_active():
+            return
+        print("HOW ARE WE HERE?", button.get_label())
 
-        if convert_type == "convert_guess":
+        if convert_type == "Convert":
             self.translate = True
             self.force = False
             self.binary = False
             unnum.set_sensitive(True)
             self.update_status("Converting based on mimetype")
             self.builder.get_object("ebcdic_encoding").set_sensitive(True)
-        elif convert_type == "convert_none":
+            self.refresh_file()
+        elif convert_type == "Do not convert":
             self.translate = False
             self.binary = True
             self.force = False
             self.unnum = False
-            if unnum.get_active():
-                unnum.set_active(False)
             self.update_status("File conversion disabled")
             unnum.set_sensitive(False)
             self.builder.get_object("ebcdic_encoding").set_sensitive(False)
-        elif convert_type == "convert_all":
+            # No need to refresh, unnum will do it
+            if unnum.get_active():
+                unnum.set_active(False)
+        elif convert_type == "Convert all to UTF-8":
             self.binary = False
             self.force = True
             self.translate = False
             unnum.set_sensitive(True)
             self.update_status("Converting all file to UTF-8")
             self.builder.get_object("ebcdic_encoding").set_sensitive(True)
-
-        self.refresh_file()
+            self.refresh_file()
 
     def extract(self, button):
         selected_items = self.get_selected()
@@ -437,7 +447,11 @@ class XMIssion:
         if files_or_all == "extract_all":
             logger.debug("Extracting all contents to {}".format(selected_folder))
             self.XMI.unload_files()
-            self.update_status("{} files extracted ({})".format(self.XMI.get_num_files(), self.sizeof_fmt(self.XMI.get_total_size())))
+            self.update_status("{} files extracted ({})".format(
+                self.XMI.get_num_files(),
+                self.sizeof_fmt(self.XMI.get_total_size())
+                )
+            )
         else:
             total = 0
             for selected in selected_items:
@@ -467,11 +481,10 @@ class XMIssion:
             info = self.XMI.get_file_info_simple(member)
             file_data = self.XMI.get_seq_decoded(member)
 
-        member_exec = self.mime_exec(info['mimetype'])
-        member_app_name = self.mime_app_name(info['mimetype'])
-        logger.debug("Opening {} with {} ({})".format(member, member_exec, member_app_name))
+        #member_exec = self.mime_exec(info['mimetype'])
+        logger.debug("Opening {} with default app".format(member))
         giotype = Gio.content_type_from_mime_type(info['mimetype'])
-        default_app = Gio.app_info_get_all_for_type(info['mimetype'])[0]
+        #default_app = Gio.app_info_get_all_for_type(info['mimetype'])[0]
         extract_folder = self.make_temp_folder()
         target = "{}/{}{}".format(extract_folder, member ,info['extension'])
 
@@ -483,9 +496,11 @@ class XMIssion:
             else:
                 extract_member.write(file_data)
 
-        self.update_status("Opening {} with {}".format(member, member_app_name))
         member_gfile = Gio.File.new_for_path(target)
-        open_app = default_app.launch([member_gfile], None)
+        uri = member_gfile.get_uri()
+        timestamp = Gtk.get_current_event_time()
+        Gtk.show_uri_on_window(None, uri, timestamp)
+        #open_app = default_app.launch([member_gfile], None)
 
     def set_overwrite(self, toggle):
         if self.overwrite:
@@ -554,7 +569,8 @@ class XMIssion:
             logger.debug("File opened: " + self.file_name)
             dialog.destroy()
             try:
-                self.load_file()
+                #self.load_file()
+                self.loading_file()
             except Exception as err:
                 logger.debug(err)
                 message = "Error Opening {}"
@@ -579,8 +595,11 @@ class XMIssion:
 
     def right_click_open(self, button):
         for selected in self.get_selected():
-            #logger.debug("Opening {}".format(selected))
-            self.extract_and_open(selected)
+            logger.debug("Opening {}".format(selected))
+
+            filename = selected[0]
+            parent = selected[1]
+            self.extract_and_open(filename, parent)
 
     def right_click_info(self, button):
         logger.debug("Right Click Info")
@@ -671,7 +690,7 @@ class XMIssion:
         # - changes code-page
         if self.file_data:
             logger.debug("Reloading data")
-            self.load_file(update_status=False)
+            self.loading_file()
         else:
             logger.debug("No data to refresh")
 
@@ -697,15 +716,15 @@ class XMIssion:
         self.file_store_treeview.clear()
 
         # Get a new object
-        self.XMI = XMIT(loglevel=self.loglevel,
+        self.XMI = xmi.XMIT(loglevel=self.loglevel,
                 unnum=self.unnum, encoding=self.codepage,
-                force=self.force, binary=self.binary
+                binary=self.binary, force_convert=self.force
                 )
 
         self.XMI.set_filename(self.file_name)
         self.XMI.set_file_object(self.file_data)
         try:
-            self.XMI.go()
+            self.XMI.open()
         except Exception as err:
             logger.debug(err)
             message = "Error opening \"{}\""
@@ -715,8 +734,8 @@ class XMIssion:
             self.err_window.show()
             self.err_window.run()
             self.err_window.hide()
+            self.stop_progress(None)
             return
-
 
         for f in self.XMI.get_files():
             info = self.XMI.get_file_info_simple(f)
@@ -747,7 +766,6 @@ class XMIssion:
 
         if update_status:
             self.update_status("{} objects ({})".format(self.XMI.get_num_files(), self.sizeof_fmt(self.XMI.get_total_size())))
-        self.close_open_progress_window()
 
     def fill_info_window(self):
 
@@ -808,6 +826,41 @@ class XMIssion:
     def natural_key(self, string_):
         """See https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/"""
         return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', string_)]
+
+    #THREADS >:(
+
+    def loading_file(self):
+        self.working_window = self.builder.get_object("loading_file_window")
+        self.builder.get_object("loading_file_label").set_text("Loading: {}".format(self.file_name))
+        self.builder.get_object("loading_file_size").set_text("File Size: {}".format(self.sizeof_fmt(len(self.file_data))))
+        self.progress_bar = self.builder.get_object("loading_file_bar")
+        self.update_status("Loading... {} ({})".format(self.file_name, self.sizeof_fmt(len(self.file_data))))
+        self.working_window.show_all()
+        self.working_window.set_keep_above(True)
+        self.work_thread = threading.Thread(target=self.run_thread)
+        self.running = True
+        GLib.timeout_add(200, self.update_progress)
+        self.work_thread.daemon = True
+        self.work_thread.start()
+
+    def update_progress(self):
+        if self.running:
+            self.progress_bar.pulse()
+        return self.running
+
+    # this will get run in a separate thread
+    def run_thread(self):
+
+        self.load_file()
+
+        GLib.idle_add(self.stop_progress)
+
+    # this will get run in the GUI thread when the worker thread is done
+    def stop_progress(self):
+        self.running = False
+        self.work_thread.join()
+        self.working_window.hide()
+
 
 logger.setLevel(logging.WARNING)
 

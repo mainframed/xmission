@@ -1,14 +1,15 @@
 [Desktop Entry]
-Categories=Settings;DesktopSettings;
-Comment=Open and extract XMI files
-Exec=/home/phil/DEV/xmission/xmission.py %f
-GenericName=Xmission
-Icon=/home/phil/DEV/xmission/xmission.png
-Keywords=theme;import;
-MimeType=application/x-plus-theme;
-Name=XMIssion
+Categories=GTK;Utility;Archiving;
+Comment=Open and extract XMI, AWS and HET files
+Exec=./xmission.py %f
+GenericName=XMIssion
+Icon=xmission.png
+Keywords=archive;manager;
+MimeType=application/x-xmi;
+Name=XMIssion XMI/AWS/HET File Manager
 Path=/tmp
 StartupNotify=true
 Terminal=false
 Type=Application
 Version=1.0
+

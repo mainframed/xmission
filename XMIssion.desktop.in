@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=XMIssion XMI/AWS/HET File Manager
+Comment=Open and extract XMI, AWS and HET files
+Exec=@prefix@/bin/xmission
+Icon=xmission
+Terminal=false
+Type=Application
+StartupNotify=false
+Categories=GTK;Utility;Archiving;
+MimeType=application/x-xmi;
+GenericName=XMIssion
+Keywords=archive;manager;
