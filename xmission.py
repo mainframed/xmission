@@ -23,6 +23,10 @@ running_folder = Path(Path(__file__).parent)
 
 UI_FILE = running_folder / "xmission.glade"
 
+__version__ = "1.0.0"
+__author__ = 'Philip Young'
+__license__ = "GPL"
+
 # Create the Logger
 logger = logging.getLogger(__name__)
 #logger.setLevel()
@@ -60,6 +64,7 @@ class XMIssion:
         "close_xmi_message" : self.close_message,
         "file_properties" : self.show_info,
         "file_properties_close" : self.close_info,
+        "file_info_clicked_cb" : self.file_info,
         "double_click_item" : self.double_click,
         "single_click_item" : self.single_click,
         "extract_files" : self.extract,
@@ -80,11 +85,16 @@ class XMIssion:
         "open_about" : self.show_about,
         "close_about" : self.close_about,
         #"loading_cancel_button_clicked_cb" : self.loading_cancelled
+        "extract_window_quit_activate_cb" : Gtk.main_quit,
+        "extract_window_show_activate_cb" : self.show_extract_folder,
+        "extract_window_show_quit_activate_cb" : self.show_extract_folder_quit,
+        "extract_window_close_activate_cb" : self.close_extract_window,
         }
 
         self.file_data = ""
         self.file_name = filename
         self.has_message = False
+        self.selected_folder = None
         self.XMI = xmi.XMIT(loglevel=self.loglevel,
                 unnum=self.unnum, encoding=self.codepage,
                 force_convert=self.force, binary=self.binary
@@ -214,6 +224,14 @@ class XMIssion:
         self.info_window.show()
         self.info_window.run()
 
+    def file_info(self, button):
+        selected = self.get_selected()
+        logger.debug("Selected: {}".format(selected))
+        if len(selected) == 0:
+            self.show_info(None)
+        else:
+            self.right_click_info(None)
+
     def close_info(self, button):
         logger.debug("Closing Info Window")
         self.info_window.hide()
@@ -259,6 +277,27 @@ class XMIssion:
         else:
             self.update_status(msg)
 
+    def show_extract_folder(self, button):
+        if not self.selected_folder:
+            return
+        logger.debug("Opening extract folder {}".format(self.selected_folder))
+        member_gfile = Gio.File.new_for_path(self.selected_folder)
+        uri = member_gfile.get_uri()
+        timestamp = Gtk.get_current_event_time()
+        Gtk.show_uri_on_window(None, uri, timestamp)
+        self.close_extract_window(None)
+
+    def show_extract_folder_quit(self, button):
+        self.show_extract_folder(None)
+        Gtk.main_quit()
+
+
+    def close_extract_window(self, button):
+        logger.debug("Closing extract window")
+        self.extract_window.hide()
+
+
+
     def double_click(self, widget, row, col):
         model = widget.get_model()
         logger.debug("Opening: {} Type: {}".format(model[row][1], model[row][3]))
@@ -296,6 +335,9 @@ class XMIssion:
             file_name_w_ext = "{}{}".format(filename, info['extension'])
         else:
             file_name_w_ext = filename
+
+        if "alias" in info:
+            file_name_w_ext += "*"
 
         self.file_store_treeview.append([img,  # file_icon
                                         file_name_w_ext,  # file_name
@@ -421,6 +463,7 @@ class XMIssion:
             #self.builder.get_object("extract_create_dir").set_sensitive(False)
         else:
             extract_radio.set_sensitive(True)
+            extract_radio.set_active(True)
             #self.builder.get_object("extract_create_dir").set_sensitive(True)
 
         dialog = self.builder.get_object("dialog_extract")
@@ -436,40 +479,96 @@ class XMIssion:
             logger.debug("File open cancelled")
             dialog.hide()
             return
+        else:
+            logger.debug("File open error?")
+            dialog.hide()
+            return
 
         files_or_all = self._resolve_radio(self.builder.get_object("extract_all")).get_name()
         dialog.hide()
-
+        self.selected_folder = selected_folder
         self.XMI.set_overwrite(self.overwrite)
         self.XMI.set_quiet()
         self.XMI.set_output_folder(selected_folder)
 
+        extract_window = self.builder.get_object("extract_window")
+        self.builder.get_object("extract_window_from_label").set_label("Extracting files from \"{}\"".format(Path(self.file_name).name))
+        extract_text = "Extracting {} to {}"
+        pulse_bar = self.builder.get_object("extract_window_progress_bar")
+
+        button_quit = self.builder.get_object("extract_window_quit")
+        button_show = self.builder.get_object("extract_window_show")
+        button_show_quit = self.builder.get_object("extract_window_show_quit")
+        button_close = self.builder.get_object("extract_window_close")
+        button_quit.set_sensitive(False)
+        button_show.set_sensitive(False)
+        button_show_quit.set_sensitive(False)
+        button_close.set_sensitive(False)
+        extract_to_label = self.builder.get_object("extract_window_to_label")
+        extract_to_label.set_label("")
+        pulse_bar.set_fraction(0.0)
+
         if files_or_all == "extract_all":
             logger.debug("Extracting all contents to {}".format(selected_folder))
+            extract_text = extract_text.format(Path(self.file_name).name, selected_folder)
+
+            extract_to_label.set_label(extract_text)
+            pulse_bar.set_fraction(0.1)
+            extract_window.show_all()
+
             self.XMI.unload_files()
+            pulse_bar.set_fraction(1.0)
+            extract_to_label.set_label("Extraction completed successfully")
+            button_quit.set_sensitive(True)
+            button_show.set_sensitive(True)
+            button_show_quit.set_sensitive(True)
+            button_close.set_sensitive(True)
+            extract_window.show_all()
+
             self.update_status("{} files extracted ({})".format(
                 self.XMI.get_num_files(),
                 self.sizeof_fmt(self.XMI.get_total_size())
                 )
             )
+
         else:
             total = 0
+            total_selected = len(selected_items)
+            total_files = 1
+
+            extract_window.show_all()
+
             for selected in selected_items:
                 filename = selected[0]
                 parent = selected[1]
 
-
+                extract_text = extract_text.format(filename, selected_folder)
+                extract_to_label.set_label(extract_text)
+                pulse_bar.set_fraction(total_selected/total_files)
+                extract_window.show_all()
                 if not parent:
                     self.XMI.unload_pds(filename)
                     num_extracted = len(self.XMI.get_members(filename)) if len(self.XMI.get_members(filename)) > 0 else 1
+                    extracted = "{} files extracted ({})".format(total, self.sizeof_fmt(self.XMI.get_dataset_size(filename)))
                     total += num_extracted
-                    self.update_status("{} files extracted ({})".format(total, self.sizeof_fmt(self.XMI.get_folder_size(filename))))
+                    logger.debug(extracted)
+                    total_files += 1
                 else:
                     total += 1
                     self.XMI.unload_file(parent, filename)
                     plural = 'files' if total > 1 else 'file'
-                    self.update_status("{} {} extracted ({})".format(total, plural, self.sizeof_fmt(self.XMI.get_member_size(parent, filename))))
+                    extracted = "{} {} extracted ({})".format(total, plural, self.sizeof_fmt(self.XMI.get_member_size(parent, filename)))
+                    logger.debug(extracted)
+                    total_files += 1
 
+            self.update_status(extracted)
+            extract_to_label.set_label("Extraction completed successfully")
+            button_quit.set_sensitive(True)
+            button_show.set_sensitive(True)
+            button_show_quit.set_sensitive(True)
+            button_close.set_sensitive(True)
+            extract_window.show_all()
+        self.extract_window = extract_window
 
     def extract_and_open(self, member, pds):
         logger.debug("Opening {}".format(member))
@@ -682,7 +781,8 @@ class XMIssion:
 
     def right_click_extract(self, button):
         logger.debug("Right Click Extract")
-
+        self.builder.get_object("extract_selected").set_active(True)
+        self.extract(button)
 
     def refresh_file(self):
         # this function gets called if someone changes the settings
@@ -693,18 +793,6 @@ class XMIssion:
             self.loading_file()
         else:
             logger.debug("No data to refresh")
-
-
-    def show_open_progress_window(self, filename):
-        logger.debug("Showing loading window")
-        self.builder.get_object("loading_file_label").set_text("Loading {}...".format(filename))
-        self.builder.get_object("loading_file_bar").pulse()
-        self.builder.get_object("loading_file_window").show()
-
-
-    def close_open_progress_window(self):
-        self.builder.get_object("loading_file_window").hide()
-
 
     def load_tape_file(self, update_status=True):
         logger.debug("Parsing Virtual Tape file {}".format(self.file_name))
@@ -831,7 +919,7 @@ class XMIssion:
 
     def loading_file(self):
         self.working_window = self.builder.get_object("loading_file_window")
-        self.builder.get_object("loading_file_label").set_text("Loading: {}".format(self.file_name))
+        self.builder.get_object("loading_file_label").set_text("Loading: {}".format(Path(self.file_name).name))
         self.builder.get_object("loading_file_size").set_text("File Size: {}".format(self.sizeof_fmt(len(self.file_data))))
         self.progress_bar = self.builder.get_object("loading_file_bar")
         self.update_status("Loading... {} ({})".format(self.file_name, self.sizeof_fmt(len(self.file_data))))
@@ -864,7 +952,7 @@ class XMIssion:
 
 logger.setLevel(logging.WARNING)
 
-desc = 'XMIssion: XMI and Virtual Tape (AWS/HET) Extraction Tool'
+desc = 'XMIssion: XMI and Virtual Tape (AWS/HET) File Manager'
 arg_parser = argparse.ArgumentParser(description=desc)
 arg_parser.add_argument('-d', '--debug', help="Print debugging statements", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.WARNING)
 arg_parser.add_argument("filename", help="xmi/het/aws to extract", nargs="?", default=None)
