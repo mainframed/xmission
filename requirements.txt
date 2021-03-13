@@ -1,0 +1,8 @@
+ebcdic==1.1.1
+pkg-resources==0.0.0
+prettytable==2.1.0
+pycairo==1.20.0
+PyGObject==3.38.0
+python-magic==0.4.22
+wcwidth==0.2.5
+xmi-reader==0.5.8

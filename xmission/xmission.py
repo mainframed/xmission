@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import gi
 import gc
@@ -21,7 +22,7 @@ import multiprocessing
 
 running_folder = Path(Path(__file__).parent)
 
-UI_FILE = running_folder / "xmission.glade"
+UI_FILE = running_folder / "ui/xmission.glade"
 
 __version__ = "1.0.0"
 __author__ = 'Philip Young'
