@@ -31,7 +31,7 @@ def get_version(rel_path):
         raise RuntimeError("Unable to find version string.")
 
 # path related stuff
-here = = pathlib.Path(__file__).parent
+here = pathlib.Path(__file__).parent
 rel_icon_path_scalable = "share/icons/hicolor/scalable/apps"
 
 # package meta data
@@ -81,7 +81,7 @@ class CustomInstall(install):
     def run(self):
         install_path, prefix = _find_install_path()
         self.update_desktop_file("data/org.github.xmission.desktop.in",
-                                 install_path,
+                                 install_path + "/xmission",
                                  os.path.join(prefix, rel_icon_path_scalable))
         install.run(self)
 
