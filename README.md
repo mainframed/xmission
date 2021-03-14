@@ -6,14 +6,25 @@
 
 Open and extract (unload) XMI/AWS/HET mainframe files.
 
+![xmission demo](data/screenshot_demo.gif)
+
+![main window](data/screenshot_main_window.png)
 
 View xmi dataset information
 
+![XMI file details](data/screenshot_xmi_details.png)
+
+Read XMI messages
+
+![XMI file details](data/screenshot_xmi_message.png)
 
 View tape file information
 
+![Virtual Tape dataset details](data/screenshot_tape_dataset_details.png)
 
 View dataset member information
+
+![Dataset member information](data/screenshot_member_details.png)
 
 ## Installation
 
