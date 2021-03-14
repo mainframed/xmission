@@ -2762,6 +2762,7 @@
   </object>
   <object class="GtkDialog" id="xmi_message_window">
     <property name="can_focus">False</property>
+    <property name="title" translatable="yes">XMI Message</property>
     <property name="destroy_with_parent">True</property>
     <property name="icon_name">mail-unread</property>
     <property name="type_hint">dialog</property>
