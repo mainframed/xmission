@@ -415,6 +415,8 @@ class XMIssion:
         dialog.set_modal(True)
         # connect the dialog with the callback function open_response_cb()
         dialog.connect("response", self.open_response)
+        #always set open to start in home folder instead of recent
+        dialog.set_current_folder(str(Path.home()))
         # show the dialog
         dialog.show()
 

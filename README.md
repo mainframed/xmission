@@ -20,8 +20,6 @@ View dataset member information
 You can install **XMIssion** from PyPI using:
 
 ```
-sudo apt install libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-3.0
-
 python3 -m pip install xmission
 
 ```
@@ -29,7 +27,13 @@ python3 -m pip install xmission
 or
 
 ```
-python3 setup.py install
+python3 setup.py install --user
+```
+
+to install system wide:
+
+```
+sudo python3 setup.py install
 ```
 
 ## What is it?
