@@ -451,7 +451,7 @@
               <object class="GtkImage">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="icon_name">accessories-archiver</property>
+                <property name="stock">gtk-directory</property>
                 <property name="use_fallback">True</property>
                 <property name="icon_size">6</property>
               </object>
