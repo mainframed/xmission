@@ -24,7 +24,7 @@ running_folder = Path(Path(__file__).parent)
 
 UI_FILE = running_folder / "ui/xmission.glade"
 
-__version__ = '0.9.4'
+__version__ = '0.9.5'
 __author__ = 'Philip Young'
 __license__ = "GPL"
 
