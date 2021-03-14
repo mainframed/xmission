@@ -70,10 +70,16 @@ def _find_install_path():
     if "--user" in sys.argv:
         inst = site.getusersitepackages()
         prefix = site.getuserbase()
+        return inst, prefix
+
+    user_lib = pathlib.Path(inst = site.getusersitepackages()).glob('**/xmission.py')
+    if any(user_lib):
+        return site.getusersitepackages(), site.getuserbase()
     else:
-        inst = site.getsitepackages()[0]
-        prefix = sys.prefix
-    return inst, prefix
+        for site_lib in site.getsitepackages():
+            srch = pathlib.Path(site_lib).glob('**/xmission.py')
+            if any(srch):
+                return pathlib.Path(site_lib).parent, sys.prefix
 
 
 class CustomInstall(install):
