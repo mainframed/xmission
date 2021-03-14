@@ -1,0 +1,3 @@
+include README.md
+include data/org.github.xmission.desktop.in
+include xmission/ui/*

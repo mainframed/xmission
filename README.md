@@ -1,8 +1,6 @@
 # XMIssion: XMI and Virtual Tape (AWS/HET) File Manager
 
-## Demo
-
-
+## Examples
 
 Open and extract (unload) XMI/AWS/HET mainframe files.
 
@@ -79,8 +77,23 @@ optional arguments:
   -d, --debug  Print debugging statements
 ```
 
+## Uninstall
+
+To uninstall:
+
+```
+python3 -m pip xmission uninstall
+```
+
+or
+
+```
+python3 setup.py uninstall --user
+```
+
 ## More Information About XMI/AWS/HET
 
+- [Project Repo](https://github.com/mainframed/xmission)
 - [xmi python library](https://xmi.readthedocs.io/)
   - [XMI File format](https://xmi.readthedocs.io/en/latest/netdata.html)
   - [AWS/HET File format](https://xmi.readthedocs.io/en/latest/vitualtape.htm)

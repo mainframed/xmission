@@ -41,8 +41,8 @@ URL = "https://github.com/mainframed/xmission"
 EMAIL = "mainframed767@gmail.com"
 AUTHOR = "Philip Young"
 LICENSE = "GPLv2"
-URL = "https://github.com/encarsia/non"
-VERSION = get_version("xmission/xmission.py"),
+URL = "https://github.com/mainframed/xmission"
+VERSION = get_version("xmission/xmission.py")[0],
 REQUIRES_PYTHON = ">=3.8"
 REQUIRED = [
             "PyGObject",
@@ -80,6 +80,7 @@ class CustomInstall(install):
 
     def run(self):
         install_path, prefix = _find_install_path()
+        print(install_path, prefix)
         self.update_desktop_file("data/org.github.xmission.desktop.in",
                                  install_path + "/xmission",
                                  os.path.join(prefix, rel_icon_path_scalable))
@@ -153,6 +154,7 @@ class UnInstall(Command):
                          (prefix, rel_icon_path_scalable, "xmission.svg"),
                          (prefix, "share/icons/hicolor/48x48/apps", "xmission.png"),
                          ("data", "org.github.xmission.desktop"),
+                         ("data", "org.github.xmission.desktop.in"),
                          ]
         for f in desktop_files:
             filepath = os.path.join(*f)
@@ -170,7 +172,7 @@ class UnInstall(Command):
 
 setup(
     name=NAME,
-    version=VERSION,
+    version=get_version("xmission/xmission.py"),
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type="text/markdown",
